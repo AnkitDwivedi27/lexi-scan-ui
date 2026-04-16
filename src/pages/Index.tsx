@@ -2,6 +2,8 @@ import { useState } from "react";
 import { runLexer, Token, SymbolEntry } from "@/lib/lexer";
 import { Play, Trash2, Download, Terminal, BookOpen, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import DFAVisualization from "@/components/DFAVisualization";
 
 const SAMPLE_CODE = `int main() {
   var x = 10;
