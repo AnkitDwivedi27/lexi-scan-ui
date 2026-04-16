@@ -2,6 +2,8 @@ import { useState } from "react";
 import { runLexer, Token, SymbolEntry } from "@/lib/lexer";
 import { Play, Trash2, Download, Terminal, BookOpen, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import DFAVisualization from "@/components/DFAVisualization";
 
 const SAMPLE_CODE = `int main() {
   var x = 10;
@@ -113,72 +115,89 @@ const Index = () => {
           )}
         </div>
 
-        {/* Results */}
-        {tokens.length > 0 && (
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Token Table */}
-            <div className="lg:col-span-2 bg-card rounded-lg border shadow-sm">
-              <div className="px-5 py-3 border-b bg-muted/50 rounded-t-lg">
-                <span className="text-sm font-medium text-muted-foreground">
-                  Token Stream — {tokens.length} tokens
-                </span>
-              </div>
-              <div className="max-h-96 overflow-auto">
-                <table className="w-full text-sm font-mono">
-                  <thead className="bg-muted sticky top-0">
-                    <tr>
-                      <th className="text-left px-4 py-2 text-muted-foreground font-medium">#</th>
-                      <th className="text-left px-4 py-2 text-muted-foreground font-medium">Token Type</th>
-                      <th className="text-left px-4 py-2 text-muted-foreground font-medium">Lexeme</th>
-                      <th className="text-left px-4 py-2 text-muted-foreground font-medium">Line</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tokens.map((t, i) => (
-                      <tr key={i} className={`border-t ${t.isError ? "bg-destructive/5" : "hover:bg-muted/30"}`}>
-                        <td className="px-4 py-1.5 text-muted-foreground">{i + 1}</td>
-                        <td className={`px-4 py-1.5 ${tokenTypeColor(t.type)}`}>{t.type}</td>
-                        <td className="px-4 py-1.5">{t.lexeme}</td>
-                        <td className="px-4 py-1.5 text-muted-foreground">{t.line}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+        {/* Tabs: Results + DFA */}
+        <Tabs defaultValue="results" className="w-full">
+          <TabsList>
+            <TabsTrigger value="results">Results</TabsTrigger>
+            <TabsTrigger value="dfa">DFA</TabsTrigger>
+          </TabsList>
 
-            {/* Symbol Table */}
-            <div className="bg-card rounded-lg border shadow-sm">
-              <div className="px-5 py-3 border-b bg-muted/50 rounded-t-lg">
-                <span className="text-sm font-medium text-muted-foreground">
-                  Symbol Table — {symbolTable.length} entries
-                </span>
-              </div>
-              <div className="max-h-96 overflow-auto">
-                {symbolTable.length === 0 ? (
-                  <p className="p-4 text-sm text-muted-foreground italic">No identifiers found.</p>
-                ) : (
-                  <table className="w-full text-sm font-mono">
-                    <thead className="bg-muted sticky top-0">
-                      <tr>
-                        <th className="text-left px-4 py-2 text-muted-foreground font-medium">Identifier</th>
-                        <th className="text-left px-4 py-2 text-muted-foreground font-medium">Pointer</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {symbolTable.map((s, i) => (
-                        <tr key={i} className="border-t hover:bg-muted/30">
-                          <td className="px-4 py-1.5 text-accent-foreground">{s.identifier}</td>
-                          <td className="px-4 py-1.5 text-muted-foreground">{s.pointer}</td>
+          <TabsContent value="results">
+            {tokens.length > 0 ? (
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Token Table */}
+                <div className="lg:col-span-2 bg-card rounded-lg border shadow-sm">
+                  <div className="px-5 py-3 border-b bg-muted/50 rounded-t-lg">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Token Stream — {tokens.length} tokens
+                    </span>
+                  </div>
+                  <div className="max-h-96 overflow-auto">
+                    <table className="w-full text-sm font-mono">
+                      <thead className="bg-muted sticky top-0">
+                        <tr>
+                          <th className="text-left px-4 py-2 text-muted-foreground font-medium">#</th>
+                          <th className="text-left px-4 py-2 text-muted-foreground font-medium">Token Type</th>
+                          <th className="text-left px-4 py-2 text-muted-foreground font-medium">Lexeme</th>
+                          <th className="text-left px-4 py-2 text-muted-foreground font-medium">Line</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                      </thead>
+                      <tbody>
+                        {tokens.map((t, i) => (
+                          <tr key={i} className={`border-t ${t.isError ? "bg-destructive/5" : "hover:bg-muted/30"}`}>
+                            <td className="px-4 py-1.5 text-muted-foreground">{i + 1}</td>
+                            <td className={`px-4 py-1.5 ${tokenTypeColor(t.type)}`}>{t.type}</td>
+                            <td className="px-4 py-1.5">{t.lexeme}</td>
+                            <td className="px-4 py-1.5 text-muted-foreground">{t.line}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Symbol Table */}
+                <div className="bg-card rounded-lg border shadow-sm">
+                  <div className="px-5 py-3 border-b bg-muted/50 rounded-t-lg">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Symbol Table — {symbolTable.length} entries
+                    </span>
+                  </div>
+                  <div className="max-h-96 overflow-auto">
+                    {symbolTable.length === 0 ? (
+                      <p className="p-4 text-sm text-muted-foreground italic">No identifiers found.</p>
+                    ) : (
+                      <table className="w-full text-sm font-mono">
+                        <thead className="bg-muted sticky top-0">
+                          <tr>
+                            <th className="text-left px-4 py-2 text-muted-foreground font-medium">Identifier</th>
+                            <th className="text-left px-4 py-2 text-muted-foreground font-medium">Pointer</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {symbolTable.map((s, i) => (
+                            <tr key={i} className="border-t hover:bg-muted/30">
+                              <td className="px-4 py-1.5 text-accent-foreground">{s.identifier}</td>
+                              <td className="px-4 py-1.5 text-muted-foreground">{s.pointer}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
               </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic py-4">Run the lexer to see results.</p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="dfa">
+            <div className="bg-card rounded-lg border shadow-sm p-5">
+              <DFAVisualization />
             </div>
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
