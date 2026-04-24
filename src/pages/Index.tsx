@@ -1,5 +1,8 @@
 import { useRef, useState } from "react";
 import { runLexer, Token, SymbolEntry } from "@/lib/lexer";
+import { runParser } from "@/lib/parser";
+import type { ASTNode } from "@/lib/parserTypes";
+import ASTViewer from "@/components/ASTViewer";
 import { Play, Trash2, Download, Terminal, BookOpen, CheckCircle2, Upload, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -21,6 +24,8 @@ const Index = () => {
   const [outputText, setOutputText] = useState("");
   const [completed, setCompleted] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [ast, setAst] = useState<ASTNode | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleRun = () => {
@@ -29,6 +34,11 @@ const Index = () => {
     setSymbolTable(result.symbolTable);
     setOutputText(result.outputText);
     setCompleted(true);
+
+    // Syntax analysis on lexer output
+    const parsed = runParser(result.tokens);
+    setAst(parsed.ast);
+    setParseError(parsed.error);
   };
 
   const handleClear = () => {
@@ -38,6 +48,8 @@ const Index = () => {
     setOutputText("");
     setCompleted(false);
     setFileName(null);
+    setAst(null);
+    setParseError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -76,6 +88,8 @@ const Index = () => {
       setSymbolTable([]);
       setOutputText("");
       setCompleted(false);
+      setAst(null);
+      setParseError(null);
       toast({ title: "File loaded", description: `${file.name} loaded successfully.` });
     };
     reader.onerror = () =>
@@ -246,6 +260,11 @@ const Index = () => {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground italic py-4">Run the lexer to see results.</p>
+        )}
+
+        {/* Syntax Analysis / AST */}
+        {(ast || parseError) && (
+          <ASTViewer ast={ast} error={parseError} />
         )}
       </main>
     </div>
