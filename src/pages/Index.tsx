@@ -88,6 +88,8 @@ const Index = () => {
       setSymbolTable([]);
       setOutputText("");
       setCompleted(false);
+      setAst(null);
+      setParseError(null);
       toast({ title: "File loaded", description: `${file.name} loaded successfully.` });
     };
     reader.onerror = () =>
