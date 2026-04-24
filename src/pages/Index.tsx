@@ -3,6 +3,7 @@ import { runLexer, Token, SymbolEntry } from "@/lib/lexer";
 import { runParser } from "@/lib/parser";
 import type { ASTNode } from "@/lib/parserTypes";
 import ASTViewer from "@/components/ASTViewer";
+import ASTGraph from "@/components/ASTGraph";
 import { Play, Trash2, Download, Terminal, BookOpen, CheckCircle2, Upload, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -264,7 +265,10 @@ const Index = () => {
 
         {/* Syntax Analysis / AST */}
         {(ast || parseError) && (
-          <ASTViewer ast={ast} error={parseError} />
+          <>
+            <ASTViewer ast={ast} error={parseError} />
+            {ast && <ASTGraph ast={ast} />}
+          </>
         )}
       </main>
     </div>
