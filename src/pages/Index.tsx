@@ -261,6 +261,11 @@ const Index = () => {
         ) : (
           <p className="text-sm text-muted-foreground italic py-4">Run the lexer to see results.</p>
         )}
+
+        {/* Syntax Analysis / AST */}
+        {(ast || parseError) && (
+          <ASTViewer ast={ast} error={parseError} />
+        )}
       </main>
     </div>
   );
