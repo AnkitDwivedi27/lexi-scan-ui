@@ -1,86 +1,23 @@
-/**
- * TypeScript port of the provided C++ DFA-based Lexical Analyzer.
- * Logic is preserved exactly — no regex, same DFA states.
- */
+// ==========================
+// FULL LEXER FROM SCRATCH
+// No Regex, No includes()
+// Manual DFA + Manual Scanning
+// ==========================
 
-enum TokenType {
-  KEYWORD,
-  IDENTIFIER,
-  INT_LITERAL,
-  FLOAT_LITERAL,
-  STRING_LITERAL,
-  OPERATOR,
-  DELIMITER,
-  UNKNOWN,
-}
-
-const keywords = [
-  "int", "float", "string", "bool",
-  "if", "else", "while", "for",
-  "return", "function", "var",
-  "true", "false", "print",
-];
-
-function isKeyword(word: string): boolean {
-  return keywords.includes(word);
-}
-
-function isIdentifierDFA(str: string): boolean {
-  let state = 0;
-  for (const ch of str) {
-    switch (state) {
-      case 0:
-        if (/[a-zA-Z]/.test(ch) || ch === "_") state = 1;
-        else return false;
-        break;
-      case 1:
-        if (/[a-zA-Z0-9]/.test(ch) || ch === "_") state = 1;
-        else return false;
-        break;
-    }
-  }
-  return state === 1;
-}
-
-function numberDFA(str: string): TokenType {
-  let state = 0;
-  for (const ch of str) {
-    switch (state) {
-      case 0:
-        if (/\d/.test(ch)) state = 1;
-        else return TokenType.UNKNOWN;
-        break;
-      case 1:
-        if (/\d/.test(ch)) state = 1;
-        else if (ch === ".") state = 2;
-        else return TokenType.UNKNOWN;
-        break;
-      case 2:
-        if (/\d/.test(ch)) state = 3;
-        else return TokenType.UNKNOWN;
-        break;
-      case 3:
-        if (/\d/.test(ch)) state = 3;
-        else return TokenType.UNKNOWN;
-        break;
-    }
-  }
-  if (state === 1) return TokenType.INT_LITERAL;
-  if (state === 3) return TokenType.FLOAT_LITERAL;
-  return TokenType.UNKNOWN;
-}
-
-function isDelimiter(ch: string): boolean {
-  return "(){};\,".includes(ch);
-}
-
-function isOperator(ch: string): boolean {
-  return "+-*/%<>=!&|".includes(ch);
+export enum TokenType {
+  KEYWORD = "KEYWORD",
+  IDENTIFIER = "IDENTIFIER",
+  INT_LITERAL = "INT_LITERAL",
+  FLOAT_LITERAL = "FLOAT_LITERAL",
+  STRING_LITERAL = "STRING_LITERAL",
+  OPERATOR = "OPERATOR",
+  DELIMITER = "DELIMITER",
+  ERROR = "ERROR",
 }
 
 export interface Token {
   lexeme: string;
-  type: string;
+  type: TokenType | string;
   line: number;
   isError: boolean;
   pointer?: number;
@@ -97,120 +34,269 @@ export interface LexerResult {
   outputText: string;
 }
 
+// ==========================
+// CHARACTER CLASSIFIERS
+// ==========================
+
+function isLetter(ch: string): boolean {
+  const code = ch.charCodeAt(0);
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+function isDigit(ch: string): boolean {
+  const code = ch.charCodeAt(0);
+  return code >= 48 && code <= 57;
+}
+
+function isUnderscore(ch: string): boolean {
+  return ch === "_";
+}
+
+function isWhitespace(ch: string): boolean {
+  return ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
+}
+
+function isDelimiter(ch: string): boolean {
+  return (
+    ch === "(" || ch === ")" || ch === "{" || ch === "}" ||
+    ch === ";" || ch === "," || ch === "[" || ch === "]"
+  );
+}
+
+function isOperator(ch: string): boolean {
+  return (
+    ch === "+" || ch === "-" || ch === "*" || ch === "/" ||
+    ch === "%" || ch === "=" || ch === "<" || ch === ">" ||
+    ch === "!" || ch === "&" || ch === "|"
+  );
+}
+
+// ==========================
+// KEYWORD CHECK
+// ==========================
+
+const keywords: string[] = [
+  "int", "float", "string", "bool",
+  "if", "else", "while", "for",
+  "return", "function", "var",
+  "true", "false", "print",
+];
+
+function isKeyword(word: string): boolean {
+  for (let i = 0; i < keywords.length; i++) {
+    if (keywords[i] === word) return true;
+  }
+  return false;
+}
+
+// ==========================
+// IDENTIFIER DFA
+// ==========================
+
+function isIdentifierDFA(str: string): boolean {
+  let state = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    switch (state) {
+      case 0:
+        if (isLetter(ch) || isUnderscore(ch)) state = 1;
+        else return false;
+        break;
+      case 1:
+        if (isLetter(ch) || isDigit(ch) || isUnderscore(ch)) state = 1;
+        else return false;
+        break;
+    }
+  }
+  return state === 1;
+}
+
+// ==========================
+// NUMBER DFA
+// ==========================
+
+function numberDFA(str: string): TokenType {
+  let state = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    switch (state) {
+      case 0:
+        if (isDigit(ch)) state = 1;
+        else return TokenType.ERROR;
+        break;
+      case 1:
+        if (isDigit(ch)) state = 1;
+        else if (ch === ".") state = 2;
+        else return TokenType.ERROR;
+        break;
+      case 2:
+        if (isDigit(ch)) state = 3;
+        else return TokenType.ERROR;
+        break;
+      case 3:
+        if (isDigit(ch)) state = 3;
+        else return TokenType.ERROR;
+        break;
+    }
+  }
+  if (state === 1) return TokenType.INT_LITERAL;
+  if (state === 3) return TokenType.FLOAT_LITERAL;
+  return TokenType.ERROR;
+}
+
+// ==========================
+// SYMBOL TABLE
+// ==========================
+
+class SymbolTable {
+  private table: SymbolEntry[];
+
+  constructor() {
+    this.table = [];
+  }
+
+  public add(identifier: string): number {
+    for (let i = 0; i < this.table.length; i++) {
+      if (this.table[i].identifier === identifier) {
+        return this.table[i].pointer;
+      }
+    }
+    const ptr = this.table.length + 1;
+    this.table.push({ identifier, pointer: ptr });
+    return ptr;
+  }
+
+  public getEntries(): SymbolEntry[] {
+    return this.table;
+  }
+}
+
+// ==========================
+// MAIN LEXER
+// ==========================
+
 export function runLexer(source: string): LexerResult {
   const tokens: Token[] = [];
-  const symbolTable = new Map<string, number>();
   const outputLines: string[] = [];
+  const symbolTable = new SymbolTable();
 
   let i = 0;
   let line = 1;
-  const len = source.length;
 
-  const peek = () => (i < len ? source[i] : null);
-  const advance = () => source[i++];
+  function currentChar(): string {
+    if (i >= source.length) return "\0";
+    return source[i];
+  }
 
-  // We process character by character, mirroring the C++ fin.get(ch) loop
-  while (i < len) {
+  function advance(): string {
+    const ch = source[i];
+    i++;
+    return ch;
+  }
+
+  while (i < source.length) {
     const ch = advance();
 
     if (ch === "\n") { line++; continue; }
-    if (/\s/.test(ch)) continue;
+    if (isWhitespace(ch)) continue;
 
-    // IDENTIFIER OR KEYWORD
-    if (/[a-zA-Z]/.test(ch) || ch === "_") {
+    // IDENTIFIER / KEYWORD
+    if (isLetter(ch) || isUnderscore(ch)) {
       let lexeme = ch;
-      while (i < len && (/[a-zA-Z0-9]/.test(source[i]) || source[i] === "_")) {
+      while (
+        isLetter(currentChar()) ||
+        isDigit(currentChar()) ||
+        isUnderscore(currentChar())
+      ) {
         lexeme += advance();
       }
+
       if (isKeyword(lexeme)) {
-        const out = `Token( ${lexeme} -----> KEYWORD ) Line: ${line}`;
-        outputLines.push(out);
-        tokens.push({ lexeme, type: "KEYWORD", line, isError: false });
+        tokens.push({ lexeme, type: TokenType.KEYWORD, line, isError: false });
+        outputLines.push(`Token( ${lexeme} -----> KEYWORD ) Line: ${line}`);
       } else if (isIdentifierDFA(lexeme)) {
-        if (!symbolTable.has(lexeme)) {
-          symbolTable.set(lexeme, symbolTable.size + 1);
-        }
-        const ptr = symbolTable.get(lexeme)!;
-        const out = `Token( ${lexeme} -----> IDENTIFIER , PTR=${ptr} ) Line: ${line}`;
-        outputLines.push(out);
-        tokens.push({ lexeme, type: "IDENTIFIER", line, isError: false, pointer: ptr });
+        const ptr = symbolTable.add(lexeme);
+        tokens.push({ lexeme, type: TokenType.IDENTIFIER, line, isError: false, pointer: ptr });
+        outputLines.push(`Token( ${lexeme} -----> IDENTIFIER , PTR=${ptr} ) Line: ${line}`);
       } else {
-        const out = `Lexical Error at line ${line} : ${lexeme}`;
-        outputLines.push(out);
-        tokens.push({ lexeme, type: "ERROR", line, isError: true });
+        tokens.push({ lexeme, type: TokenType.ERROR, line, isError: true });
+        outputLines.push(`Lexical Error at line ${line} : ${lexeme}`);
       }
     }
     // NUMBER
-    else if (/\d/.test(ch)) {
+    else if (isDigit(ch)) {
       let lexeme = ch;
-      while (i < len && (/\d/.test(source[i]) || source[i] === ".")) {
+      while (isDigit(currentChar()) || currentChar() === ".") {
         lexeme += advance();
       }
       const type = numberDFA(lexeme);
       if (type === TokenType.INT_LITERAL) {
-        const out = `Token( ${lexeme} -----> INT_LITERAL ) Line: ${line}`;
-        outputLines.push(out);
-        tokens.push({ lexeme, type: "INT_LITERAL", line, isError: false });
+        tokens.push({ lexeme, type, line, isError: false });
+        outputLines.push(`Token( ${lexeme} -----> INT_LITERAL ) Line: ${line}`);
       } else if (type === TokenType.FLOAT_LITERAL) {
-        const out = `Token( ${lexeme} -----> FLOAT_LITERAL ) Line: ${line}`;
-        outputLines.push(out);
-        tokens.push({ lexeme, type: "FLOAT_LITERAL", line, isError: false });
+        tokens.push({ lexeme, type, line, isError: false });
+        outputLines.push(`Token( ${lexeme} -----> FLOAT_LITERAL ) Line: ${line}`);
       } else {
-        const out = `Lexical Error at line ${line} : ${lexeme}`;
-        outputLines.push(out);
-        tokens.push({ lexeme, type: "ERROR", line, isError: true });
+        tokens.push({ lexeme, type: TokenType.ERROR, line, isError: true });
+        outputLines.push(`Lexical Error at line ${line} : ${lexeme}`);
       }
     }
     // STRING
     else if (ch === '"') {
       let lexeme = '"';
       let terminated = false;
-      while (i < len) {
+
+      while (i < source.length) {
         const c = advance();
         if (c === '"') { lexeme += '"'; terminated = true; break; }
         if (c === "\n") {
-          const out = `Unterminated string at line ${line}`;
-          outputLines.push(out);
-          tokens.push({ lexeme, type: "ERROR", line, isError: true });
+          tokens.push({ lexeme, type: TokenType.ERROR, line, isError: true });
+          outputLines.push(`Unterminated string at line ${line}`);
           line++;
           break;
         }
         lexeme += c;
       }
+
       if (terminated) {
-        const out = `Token( ${lexeme} -----> STRING_LITERAL ) Line: ${line}`;
-        outputLines.push(out);
-        tokens.push({ lexeme, type: "STRING_LITERAL", line, isError: false });
+        tokens.push({ lexeme, type: TokenType.STRING_LITERAL, line, isError: false });
+        outputLines.push(`Token( ${lexeme} -----> STRING_LITERAL ) Line: ${line}`);
       }
     }
     // DELIMITER
     else if (isDelimiter(ch)) {
-      const out = `Token( ${ch} -----> DELIMITER ) Line: ${line}`;
-      outputLines.push(out);
-      tokens.push({ lexeme: ch, type: "DELIMITER", line, isError: false });
+      tokens.push({ lexeme: ch, type: TokenType.DELIMITER, line, isError: false });
+      outputLines.push(`Token( ${ch} -----> DELIMITER ) Line: ${line}`);
     }
     // OPERATOR
     else if (isOperator(ch)) {
       let lexeme = ch;
-      if (i < len && isOperator(source[i])) {
+      const next = currentChar();
+      if (
+        (ch === "=" && next === "=") ||
+        (ch === "!" && next === "=") ||
+        (ch === "<" && next === "=") ||
+        (ch === ">" && next === "=") ||
+        (ch === "&" && next === "&") ||
+        (ch === "|" && next === "|")
+      ) {
         lexeme += advance();
       }
-      const out = `Token( ${lexeme} -----> OPERATOR ) Line: ${line}`;
-      outputLines.push(out);
-      tokens.push({ lexeme, type: "OPERATOR", line, isError: false });
+      tokens.push({ lexeme, type: TokenType.OPERATOR, line, isError: false });
+      outputLines.push(`Token( ${lexeme} -----> OPERATOR ) Line: ${line}`);
     }
     // UNKNOWN
     else {
-      const out = `Lexical Error at line ${line} : ${ch}`;
-      outputLines.push(out);
-      tokens.push({ lexeme: ch, type: "ERROR", line, isError: true });
+      tokens.push({ lexeme: ch, type: TokenType.ERROR, line, isError: true });
+      outputLines.push(`Lexical Error at line ${line} : ${ch}`);
     }
   }
 
   outputLines.push("Lexical Analysis Completed.");
 
-  const symEntries: SymbolEntry[] = [];
-  symbolTable.forEach((ptr, id) => symEntries.push({ identifier: id, pointer: ptr }));
-
-  return { tokens, symbolTable: symEntries, outputText: outputLines.join("\n") };
+  return {
+    tokens,
+    symbolTable: symbolTable.getEntries(),
+    outputText: outputLines.join("\n"),
+  };
 }
